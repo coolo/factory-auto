@@ -184,8 +184,9 @@ def _checker_one_request(self, rq, cmd, opts):
         print(opts)
     id = int(rq.get('id'))
     act_id = 0
-    approved_actions = 0
     actions = rq.findall('action')
+    okay=True
+    msg=""
     for act in actions:
         act_id += 1
         _type = act.get('type');
@@ -225,12 +226,12 @@ def _checker_one_request(self, rq, cmd, opts):
                 msg = "'%s/%s' is the devel package, submission is from '%s'" % (dprj, dpkg, prj)
                 self._checker_change_review_state(opts, id, 'declined', by_group='factory-auto', message=msg)
                 print "declined " + msg
-                continue
+                return
             if not dprj and not self._devel_projects.has_key(prj + "/"):
                 msg = "'%s' is not a valid devel project of %s - please pick one of the existent" % (prj, tprj)
                 self._checker_change_review_state(opts, id, 'declined', by_group='factory-auto', message=msg)
                 print "declined " + msg
-                continue
+                return
 
             try:
                 url = makeurl(opts.apiurl, ['status', "bsrequest?id=%d" % id])
@@ -278,26 +279,29 @@ def _checker_one_request(self, rq, cmd, opts):
                     msg = "please make sure to wait before these depencencies are in {0}: {1}".format(tprj, ', '.join(smissing))
                     self._checker_change_review_state(opts, id, 'new', by_group='factory-auto', message=msg)
                     print "updated " + msg
+                    okay=False
                     continue
                 if alldisabled:
                     msg = "the package is disabled or does not build against factory. Please fix and resubmit"
                     self._checker_change_review_state(opts, id, 'declined', by_group='factory-auto', message=msg)
                     print "declined " + msg
-                    continue
+                    return
 	        if foundoutdated:
 		    msg = "the package sources were changed after submissions and the old sources never built. Please resubmit"
 	            self._checker_change_review_state(opts, id, 'declined', by_group='factory-auto', message=msg)
 		    print "declined " + msg
-		    continue
+                    return
 		if foundbuilding:	
 		    msg = "the package is still building for repository {0}".format(foundbuilding)
 		    self._checker_change_review_state(opts, id, 'new', by_group='factory-auto', message=msg)
                     print "updated " + msg
-		    continue
+                    okay=False
+                    continue
 	        if foundfailed:
                     msg = "the package failed to build in repository {0} - not accepting".format(foundfailed)
                     self._checker_change_review_state(opts, id, 'new', by_group='factory-auto', message=msg)
 		    print "updated " + msg
+                    okay=False
                     continue
 
                 print ET.tostring(root)
@@ -326,7 +330,7 @@ def _checker_one_request(self, rq, cmd, opts):
 	    if r.name != tpkg:
 		msg = "A pkg submitted as %s has to build as 'Name: %s' - found Name '%s'" % (tpkg, tpkg, r.name)
                 self._checker_change_review_state(opts, id, 'declined', by_group='factory-auto', message=msg)
-		continue	 
+                return
 
             civs = "LC_ALL=C perl /suse/coolo/checker/source-checker.pl _old %s 2>&1" % tpkg
             p = subprocess.Popen(civs, shell=True, stdout=subprocess.PIPE, close_fds=True)
@@ -340,7 +344,7 @@ def _checker_one_request(self, rq, cmd, opts):
                 self._checker_change_review_state(opts, id, 'declined', by_group='factory-auto', message=msg)
                 print "declined " + msg
 		shutil.rmtree(dir)
-                continue
+                return
 
 	    firstarch=goodrepo.find('arch')
 	    if not firstarch is None:
@@ -365,19 +369,17 @@ def _checker_one_request(self, rq, cmd, opts):
 			print "declined " + msg
        		        self._checker_change_review_state(opts, id, 'new', by_group='factory-auto', message=msg)
 			isdeclined = True
+                        okay=False
 			break
 		if isdeclined: 
    		     shutil.rmtree(dir)
 		     continue
  
 	    shutil.rmtree(dir)
-            msg="Builds for repo %s" % goodrepo.attrib['name']
+            msg = msg + "\n==================================\nBuilds for repo %s" % goodrepo.attrib['name']
             if len(checked):
                 msg = msg + "\n\nOutput of check script (non-fatal):\n" + output
                 
-            if self._checker_accept_request(opts, id, msg):
-               continue
-
             if cmd == "list":
                 pass
             elif cmd == "checker_checkout" or cmd == "co":
@@ -385,10 +387,30 @@ def _checker_one_request(self, rq, cmd, opts):
                 self._checker_checkout_add(prj, pkg, rev, opts)
             else:
                 print "unknown command: %s" % cmd
+
+        elif (_type == "delete"):
+            print "DELETE(%d):" % id
+            pass
+        elif (_type == "change_devel"):
+            print "CHANGE_DEVEL(%d):" % id
+            pass
+        elif (_type == "addrole"):
+            print "ADD_ROLE(%d):" % id
+            # we could allow roles like "bugowner" here ...
+            msg = "Adding a role is not allow in Factory packages."
+            self._checker_change_review_state(opts, id, 'declined', by_group='factory-auto', message=msg)
+            print "declined " + msg
+            return
         else:
-            self._checker_change_review_state(opts, id, 'accepted',
-                                              by_group='factory-auto',
-                                              message="Unchecked request type %s" % _type)
+            print "UNHANDLED TYPE(%d):" % id
+            msg = "Action " + _type + " is not supported in Factory"
+            self._checker_change_review_state(opts, id, 'declined', by_group='factory-auto', message=msg)
+            print "declined " + msg
+            return
+
+    if okay:
+        self._checker_accept_request(opts, id, msg)
+
 
 def _checker_check_devel_package(self, opts, project, package):
     if not self._devel_projects.has_key(project):

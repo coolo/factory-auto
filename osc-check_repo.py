@@ -563,7 +563,7 @@ def _check_repo_buildsuccess(self, p, opts):
     result = False
     p.goodrepo = None
     missings = {}
-    alldisabled = True
+    # alldisabled = True
     foundbuilding = None
     foundfailed = None
 
@@ -584,7 +584,8 @@ def _check_repo_buildsuccess(self, p, opts):
 
     for repo in tocheckrepos:
         isgood = True
-        founddisabled = False
+        # founddisabled = False
+        foundsucceeded = False
         r_foundbuilding = None
         r_foundfailed = None
         r_missings = {}
@@ -597,10 +598,12 @@ def _check_repo_buildsuccess(self, p, opts):
                         missings[pkg] = 1
             if not (arch.attrib['result'] in ['succeeded', 'excluded']):
                 isgood = False
+            if arch.attrib['result'] == 'succeeded':
+                foundsucceeded = True
             if arch.attrib['result'] == 'excluded' and arch.attrib['arch'] == 'x86_64':
                 p.build_excluded = True
-            if arch.attrib['result'] == 'disabled':
-                founddisabled = True
+            # if arch.attrib['result'] == 'disabled':
+            #     founddisabled = True
             if arch.attrib['result'] == 'failed':
                 r_foundfailed = repo.attrib['name']
             if arch.attrib['result'] == 'building':
@@ -619,8 +622,8 @@ def _check_repo_buildsuccess(self, p, opts):
         r_missings = r_missings.keys()
         for pkg in r_missings:
             missings[pkg] = 1
-        if not founddisabled:
-            alldisabled = False
+        # if not founddisabled:
+        #    alldisabled = False
         if isgood:
             p.goodrepo = repo.attrib['name']
             result = True
@@ -634,7 +637,7 @@ def _check_repo_buildsuccess(self, p, opts):
     if result:
         return True
 
-    if alldisabled:
+    if not foundsucceeded:
         msg = '%s is disabled or does not build against factory. Please fix and resubmit' % p.spackage
         print 'DECLINED', msg
         self._check_repo_change_review_state(opts, p.request, 'declined', message=msg)

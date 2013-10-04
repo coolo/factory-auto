@@ -650,7 +650,7 @@ def _check_repo_buildsuccess(self, p, opts):
         return False
     if foundfailed:
         msg = '%s failed to build in repository %s - not accepting' % (p.spackage, foundfailed)
-        # XXX Do we need to autodecline this case?
+        # failures might be temporary, so don't autoreject but wait for a human to check
         print 'UPDATED', msg
         self._check_repo_change_review_state(opts, p.request, 'new', message=msg)
         # Next line not needed, but for documentation
@@ -693,6 +693,27 @@ def _check_repo_get_binary(self, apiurl, prj, repo, arch, package, file, target)
     get_binary_file(apiurl, prj, repo, arch, file, package = package, target_filename = target)
 
 
+def _get_verifymd5(self, p, rev):
+    try:
+        url = makeurl(self.get_api_url(), ['source', p.sproject, p.spackage, '?view=info&rev=%s' % rev])
+        root = ET.parse(http_GET(url)).getroot()
+    except urllib2.HTTPError, e:
+        print 'ERROR in URL %s [%s]' % (url, e)
+        return []
+    return root.attrib['verifymd5']
+
+def _checker_compare_disturl(self, disturl, p):
+    distmd5 = os.path.basename(disturl).split('-')[0]
+    if distmd5 == p.rev:
+        return True
+
+    vrev1 = self._get_verifymd5(p, p.rev)
+    vrev2 = self._get_verifymd5(p, distmd5)
+    if vrev1 == vrev2:
+        return True
+    print vrev1, vrev2
+    return False
+
 def _check_repo_download(self, p, destdir, opts):
     if p.build_excluded:
         return [], []
@@ -720,10 +741,10 @@ def _check_repo_download(self, p, destdir, opts):
             pid = subprocess.Popen(['rpm', '--nosignature', '--queryformat', '%{DISTURL}', '-qp', t], 
                                    stdout=subprocess.PIPE, close_fds=True)
             os.waitpid(pid.pid, 0)[1]
-            disturl = pid.stdout.readlines()
+            disturl = pid.stdout.readlines()[0]
 
-            if not os.path.basename(disturl[0]).startswith(p.rev):
-                p.error = 'disturl %s does not match revision %s' % (disturl[0], p.rev)
+            if not self._checker_compare_disturl(disturl, p):
+                p.error = 'disturl %s does not match revision %s' % (disturl, p.rev)
                 return [], []
 
     toignore = []
@@ -813,7 +834,7 @@ def _get_builddepinfo_graph(self, opts, project='openSUSE:Factory', repository='
         missing = [d for d in deps if not d.startswith(_IGNORE_PREFIX) and d not in subpkgs]
         if missing:
             if p.pkg not in _ignore_packages:
-                print 'Ignoring package. Missing dependencies %s -> (%s) %s...' % (p.pkg, len(missing), missing[:5])
+                #print 'Ignoring package. Missing dependencies %s -> (%s) %s...' % (p.pkg, len(missing), missing[:5])
                 _ignore_packages.add(p.pkg)
             continue
 

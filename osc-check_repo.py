@@ -569,6 +569,10 @@ def _check_repo_buildsuccess(self, p, opts):
 
     tocheckrepos = []
     for repo in root.findall('repository'):
+        # Ignore repositories that are different from the one related
+        # with the current SR
+        if p.tproject != repo:
+            continue
         archs = [a.attrib['arch'] for a in repo.findall('arch')]
         foundarchs = len([a for a in archs if a in ('i586', 'x86_64')])
         if foundarchs == 2:

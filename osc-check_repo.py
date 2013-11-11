@@ -569,6 +569,10 @@ def _check_repo_buildsuccess(self, p, opts):
 
     tocheckrepos = []
     for repo in root.findall('repository'):
+        # Ignore repositories that are different from the one related
+        # with the current SR
+        if p.tproject != repo:
+            continue
         archs = [a.attrib['arch'] for a in repo.findall('arch')]
         foundarchs = len([a for a in archs if a in ('i586', 'x86_64')])
         if foundarchs == 2:
@@ -836,7 +840,7 @@ def _get_builddepinfo_graph(self, opts, project='openSUSE:Factory', repository='
         missing = [d for d in deps if not d.startswith(_IGNORE_PREFIX) and d not in subpkgs]
         if missing:
             if p.pkg not in _ignore_packages:
-                #print 'Ignoring package. Missing dependencies %s -> (%s) %s...' % (p.pkg, len(missing), missing[:5])
+                # print 'Ignoring package. Missing dependencies %s -> (%s) %s...' % (p.pkg, len(missing), missing[:5])
                 _ignore_packages.add(p.pkg)
             continue
 

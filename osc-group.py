@@ -77,13 +77,16 @@ def _group_find_request_project(self, source_project, opts):
     :param opts: obs options
     """
 
-    url = makeurl(opts.apiurl, ['request'], 'states=new,review&project=openSUSE:Factory&view=collection&project={0}'.format(project))
+    url = makeurl(opts.apiurl, ['request'], 'states=new,review&project=openSUSE:Factory&view=collection')
     f = http_GET(url)
     root = ET.parse(f).getroot()
 
     res = []
     for rq in root.findall('request'):
-        res.append(int(rq.attrib['id']))
+        for a in rq.findall('action'):
+            s = a.find('source')
+            if s is not None and s.get('project') == source_project:
+                res.append(int(rq.attrib['id']))
 
     if len(res) == 0:
         #raise oscerr.WrongArgs('There are no requests for base project "{0}"'.format(source_project))

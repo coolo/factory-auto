@@ -106,26 +106,27 @@ for my $spec (glob ("$dir/*.spec")) {
 
 my $result;
 foreach (@bugs) {
-	# curl the state
-	$result = `curl --silent --head "https://bugzilla.novell.com/show_bug.cgi?id=$_" 2>&1`;
-	# only if curl succeeded do the check, bugzie down too much to be reliable
-	if ($? == 0) {
-		#if we have the ichain location then we actually need to login
-		if ($result =~ m/Location: ichainlogin.cgi/) {
-			push(@failing_bugs, $_);
-			next;
-		}
-		#if we get anything not like 200 on result we fail the pkg
-		my $check = ($result =~ m/HTTP\/1.1 200 OK/);
-		if (!$check) {
-			push(@failing_bugs, $_);
-		}
-	}
+    # curl the state
+    $result = `curl --silent --head "https://bugzilla.novell.com/show_bug.cgi?id=$_" 2>&1`;
+    # only if curl succeeded do the check, bugzie down too much to be reliable
+    if ($? == 0) {
+        #if we have the ichain location then we actually need to login
+        if ($result =~ m/Location: ichainlogin.cgi/) {
+            push(@failing_bugs, $_);
+            next;
+        }
+        #if we get anything not like 200 on result we fail the pkg
+        my $check = ($result =~ m/HTTP\/1.1 200 OK/);
+        if (!$check) {
+            push(@failing_bugs, $_);
+        }
+    }
 }
 
 if (scalar(@failing_bugs) > 0) {
-	print "Package contains following bnc# entries which are not visible for community: ".join( ', ', @failing_bugs);
-	exit(1);
+    print "Package contains following bnc# entries which are not visible for community: ".join( ', ', @failing_bugs);
+    print "For explanation please visit http://lists.opensuse.org/opensuse-packaging/2013-11/msg00042.html";
+    exit(1);
 }
 
 if ($spec !~ m/\n%changelog\s/ && $spec != m/\n%changelog$/) {

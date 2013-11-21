@@ -85,6 +85,49 @@ if (!$changes_updated) {
     exit(1); 
 }
 
+my @bugs;
+my @failing_bugs;
+for my $spec (glob ("$dir/*.spec")) {
+    $changes = basename ($spec);
+    $changes =~ s/\.spec$/.changes/;
+    # read the changelog as whole in the new
+    # we can't rely on diff as they might remove bnc to fix it
+    # and to implement diff logic is overkill so just always verify all bugs
+    my $content;
+    open(my $fh, '<', "$dir/$changes") or die "cannot open file $changes";
+    {
+        local $/;
+        $content = <$fh>;
+    }
+    close($fh);
+    my @matches = ($content =~ m/bnc#(\d+)/g);
+    push(@bugs, @matches);
+}
+
+my $result;
+foreach (@bugs) {
+	# curl the state
+	$result = `curl --silent --head "https://bugzilla.novell.com/show_bug.cgi?id=$_" 2>&1`;
+	# only if curl succeeded do the check, bugzie down too much to be reliable
+	if ($? == 0) {
+		#if we have the ichain location then we actually need to login
+		if ($result =~ m/Location: ichainlogin.cgi/) {
+			push(@failing_bugs, $_);
+			next;
+		}
+		#if we get anything not like 200 on result we fail the pkg
+		my $check = ($result =~ m/HTTP\/1.1 200 OK/);
+		if (!$check) {
+			push(@failing_bugs, $_);
+		}
+	}
+}
+
+if (scalar(@failing_bugs) > 0) {
+	print "Package contains following bnc# entries which are not visible for community: ".join( ', ', @failing_bugs);
+	exit(1);
+}
+
 if ($spec !~ m/\n%changelog\s/ && $spec != m/\n%changelog$/) {
     print "$bname.spec does not contain a %changelog line. We don't want a changelog in the spec file, but the %changelog section needs to be present\n";
     exit(1);

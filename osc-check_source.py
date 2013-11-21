@@ -143,7 +143,7 @@ def _checker_one_request(self, rq, cmd, opts):
             if os.path.exists(dir):
                 print("%s already exists" % dir)
                 continue
-            os.mkdir(dir)
+            os.makedirs(dir)
             os.chdir(dir)
             try:
                 checkout_package(opts.apiurl, tprj, tpkg, pathname=dir,

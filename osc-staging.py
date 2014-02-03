@@ -534,6 +534,35 @@ def _staging_check_depinfo_ring(self, prj, nextprj, opts):
           if nextprj:
               print "osc linkpac -c openSUSE:Factory", source, nextprj
 
+# fetch a dict of package->md5 to compare 2 prjs
+def _staging_fetch_prj(self, prj, opts):
+    url = makeurl(opts.apiurl, ['status', 'project', prj])
+    root = ET.parse(http_GET(url)).getroot()
+    #print ET.tostring(root)
+    ret = dict()
+    for p in root.findall('package'):
+        ret[p.attrib['name']] = p.attrib.get('verifymd5', p.attrib['srcmd5'])
+    #print ret
+    return ret
+
+def _staging_check_ring(self, prj, opts):
+    ring = self._staging_fetch_prj(prj, opts)
+    for p in ring.keys():
+        if self.ringed.has_key(p):
+            print "osc rdelete", prj, p, "-m", "'in two rings'"
+            continue
+        self.ringed[p] = ring[p]
+        if ring.get(p) != self.fact.get(p) and not p in ['rpmlint-mini-AGGR']:
+            print "HUH", p, ring.get(p), self.fact.get(p)
+
+def _staging_check_rings(self, opts):
+    self.ringed = dict()
+    self.fact = self._staging_fetch_prj('openSUSE:Factory', opts)
+    self._staging_check_ring("openSUSE:Factory:Build", opts)
+    self._staging_check_ring("openSUSE:Factory:Core", opts)
+    self._staging_check_ring("openSUSE:Factory:MainDesktops", opts)
+    self._staging_check_ring("openSUSE:Factory:DVD", opts)
+
 @cmdln.option('-e', '--everything', action='store_true', dest='everything',
               help='during check do not stop on first first issue and show them all')
 @cmdln.option('-p', '--parent', metavar='TARGETPROJECT',
@@ -584,7 +613,7 @@ def do_staging(self, subcmd, opts, *args):
         min_args, max_args = 1, 2
     elif cmd in ['create', 'c']:
         min_args, max_args = 1, 2
-    elif cmd in ['list', 'cleanup_rings']:
+    elif cmd in ['list', 'cleanup_rings', 'check_rings']:
         min_args, max_args = 0, 0
     else:
         raise RuntimeError('Unknown command: %s'%(cmd))
@@ -625,6 +654,8 @@ def do_staging(self, subcmd, opts, *args):
         self._staging_freeze_prjlink(args[1], opts)
     elif cmd in ['cleanup_rings']:
         self._staging_cleanup_rings(opts)
+    elif cmd in ['check_rings']:
+        self._staging_check_rings(opts)
     elif cmd in ['accept', 'list']:
         self.letter_to_accept = None
         if cmd == 'accept':

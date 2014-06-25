@@ -10,6 +10,10 @@ mkdir $dir
   osc api "/search/package/?match=@project='$i'"
 done | grep '<person.*role="maintainer"'
 ) | sed -e 's,.*userid=",,; s,".*,,'  | sort -u > $users
+for i in Mailaender; do
+  grep -vx $i $users > $users.new && mv $users.new $users
+done
+
 for i in `cat $users`; do 
   echo "generate $i"
   perl generate-reminder.pl $i > $dir/$i.txt

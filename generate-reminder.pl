@@ -146,7 +146,7 @@ sub generate_report($)
         my $develproject = $package->{develproject} || next;
         next if ($develproject eq $tproject); 
 	$projects{$develproject} ||= [];
-	push($projects{$develproject}, $package);
+	push(@{$projects{$develproject}}, $package);
     }
 
     my %reviews_by;

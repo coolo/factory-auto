@@ -20,7 +20,11 @@
 
 import osc
 import osc.core
-import urllib2
+
+try:
+    import urllib.error.HTTPError as HTTPError
+except ImportError:
+    from urllib.error import HTTPError
 
 from osc import cmdln
 from osc import conf
@@ -85,7 +89,7 @@ def do_checkupdate(self, subcmd, opts, *args):
     number_re = re.compile(r".*\.(\d+)$")
 
     if mode == CHECK:
-        print "running diff %s %s"%(prj, dprj)
+        print ("running diff %s %s"%(prj, dprj))
 
     todel = []
     for p in pkgs:
@@ -100,23 +104,23 @@ def do_checkupdate(self, subcmd, opts, *args):
                         fn = node.get('filename')
                         if not fn.endswith('.src.rpm'):
                             continue
-                        print 'src:', fn[:-len('.src.rpm')]
-                except urllib2.HTTPError, e:
+                        print ('src:', fn[:-len('.src.rpm')])
+                except HTTPError as e:
                     if e.code != 404:
-                        print "error:", e
+                        print ("error:", e)
                         continue
-                    print "no binaries found"
-                print "delete %s"%p
+                    print ("no binaries found")
+                print ("delete %s"%p)
                 delete_package(apiurl, prj, p, False, msg)
                 if not p.startswith('patchinfo.'):
                     pn = p[:-len(sfx)]
-                    print "delete %s"%pn
+                    print ("delete %s"%pn)
                     try:
                         True
                         delete_package(apiurl, prj, pn, False, msg)
-                    except urllib2.HTTPError, e:
+                    except HTTPError as e:
                         if e.code == 404:
-                            print "not found, skip"
+                            print ("not found, skip")
                             continue
                         raise e
         elif mode == CHECK:
@@ -129,7 +133,7 @@ def do_checkupdate(self, subcmd, opts, *args):
             if p.startswith("patchinfo."):
                 continue
 
-            print "checking %s" % p
+            print ("checking %s" % p)
 
             url = makeurl(apiurl, ['source', prj, p, '_link'])
             try:
@@ -146,9 +150,9 @@ def do_checkupdate(self, subcmd, opts, *args):
                     if m1 and m2 and m1.groups()[0] == m2.groups()[0]:
                         linktomain = True
                     incidentnr = m2.groups()[0]
-            except urllib2.HTTPError, e:
+            except HTTPError as e:
                 if e.code != 404:
-                    print "error:", e
+                    print ("error:", e)
                     continue
                 else:
                     # ignore not linked packages for now
@@ -159,8 +163,8 @@ def do_checkupdate(self, subcmd, opts, *args):
 
             try:
                 diff = server_diff(apiurl, prj, p, None, dprj, p, None)
-            except urllib2.HTTPError, e:
-                print "error:", e
+            except HTTPError as e:
+                print ("error:", e)
                 continue
 
             if diff:
@@ -189,8 +193,8 @@ def do_checkupdate(self, subcmd, opts, *args):
                         elif line[0] == '-':
                             removed += 1
 
-                print "+++ %s: %s has changes (%d+, %d-)" % (incidentnr, p, added, removed)
+                print ("+++ %s: %s has changes (%d+, %d-)" % (incidentnr, p, added, removed))
             else:
-                print "%s: %s ok" % (incidentnr, p)
+                print ("%s: %s ok" % (incidentnr, p))
 
 # vim: sw=4 et
